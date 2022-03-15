@@ -11,6 +11,7 @@ class Data:
         self.n_sample = self.data.n_sample
         self.dims = self.data.dims
         self.n_view = self.data.n_view
+        self.n_classes = self.data.n_classes
 
     def select_data(self):
         if self.args.dataset == 'voc':

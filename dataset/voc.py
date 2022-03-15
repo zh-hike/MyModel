@@ -11,6 +11,7 @@ class Voc(Dataset):
         self.n_sample = 5649
         self.dims = [512, 399]
         self.n_view = 2
+        self.n_classes = 20
         self.convert_type(standard)
 
     def convert_type(self, standard):
