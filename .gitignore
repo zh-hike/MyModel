@@ -2,3 +2,4 @@
 *.pkl
 *.npz
 .DS_Store
+*.ipynb
