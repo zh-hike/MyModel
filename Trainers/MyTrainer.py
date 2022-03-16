@@ -1,7 +1,10 @@
 import torch
-from models.MyModel import AutoEncoder
-from loss.OtherLoss import MSELoss
+from models.MyModel import AutoEncoder, Cluster
+from loss.OtherLoss import MSELoss, Dreg, AttLoss
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from sklearn.cluster import KMeans
+from models.utils import weight_init
+
 
 
 class MyTrainer:
@@ -23,7 +26,7 @@ class MyTrainer:
         :return:
         """
         self.autoencoder = AutoEncoder(self.args)
-        print(self.autoencoder)
+        # print(self.autoencoder)
         self.autoencoder.to(self.device)
         self.auto_opt = torch.optim.Adam(self.autoencoder.parameters(),
                                          lr=self.args.config['network'][self.dataset]['autoencoder']['lr']
@@ -32,7 +35,25 @@ class MyTrainer:
                                            patience=self.epochs / 5,
                                            factor=0.5,
                                            verbose=True, )
+
+        self.clusternet = Cluster(self.args)
+        self.clusternet.to(self.device)
+        self.cluster_opt = torch.optim.Adam(self.clusternet.parameters(),
+                                            lr=self.args.config['network'][self.dataset]['cluster']['lr'])
+        self.cluster_sche = ReduceLROnPlateau(self.cluster_opt,
+                                              patience=self.epochs / 5,
+                                              factor=0.5,
+                                              verbose=True,
+                                              )
+
+        # self.autoencoder.apply(weight_init)
+        self.clusternet.apply(weight_init)
         self.mseloss = MSELoss()
+        self.dregloss = Dreg()
+        self.att_loss = AttLoss(self.args.sigma)
+        # if self.args.eval:
+        #     self.autoencoder.eval()
+        #     self.clusternet.eval()
 
     def train_a_batch(self, views):
         """
@@ -41,7 +62,9 @@ class MyTrainer:
         :return: labels ，预测结果
         """
         self.loss = 0
-        self.zs, self.xs_bar = self.autoencoder(views)
+
+        # zs: 多视图的list特征 ，  attention_zs: 进过attention融合后的，  xs_bar：自编码器的输出
+        self.zs, self.attention_zs, self.xs_bar, self.ws = self.autoencoder(views)
         autoloss = 0
         for x, x_bar in zip(views, self.xs_bar):
             autoloss += self.mseloss(x, x_bar)
@@ -49,20 +72,31 @@ class MyTrainer:
         self.loss += autoloss
 
         if not self.pretrain:
-            self.add_compare_loss()
+            pred = self.add_compare_loss()
 
         self._grad_zero()
         self._backward()
         self._step()
 
         if self.pretrain:
+            # pred = self.cluster(self.attention_zs.detach().cpu().numpy())
+            # return pred
             return None
         else:
-            return -1
+            return pred.argmax(dim=1).detach().cpu().numpy()
+
+    def cluster(self, data):
+        model = KMeans(self.args.config['network'][self.dataset]['n_classes'])
+        pred = model.fit_predict(data)
+        return pred
 
     def add_compare_loss(self):
+        pred = self.clusternet(self.attention_zs)
 
-        pass
+        self.loss += 2*self.dregloss(pred)
+
+        # self.loss += 1*self.att_loss(self.zs, self.ws, self.attention_zs)
+        return pred
 
     def _backward(self):
         """
@@ -89,7 +123,50 @@ class MyTrainer:
     def save_model(self):
         auto_statedict = self.autoencoder.state_dict()
         auto_opt = self.auto_opt.state_dict()
+        auto_sche = self.auto_sche.state_dict()
+
+        cluster_net = self.clusternet.state_dict()
+        cluster_opt = self.cluster_opt.state_dict()
+        cluster_sche = self.cluster_sche.state_dict()
+
+        data = {'auto_net': auto_statedict,
+                'auto_opt': auto_opt,
+                'auto_sche': auto_sche,
+                'cluster_net': cluster_net,
+                'cluster_opt': cluster_opt,
+                'cluster_sche': cluster_sche,
+                }
+        if self.args.eval:
+            return
         if self.pretrain:
-            data = {'net': auto_statedict,
-                    'opt': auto_opt, }
+            print("保存预训练模型参数")
             torch.save(data, './results/%s/StateDict/preTrainNet.pt' % self.args.model)
+        else:
+            print("保存模型参数")
+            torch.save(data, './results/%s/StateDict/Net.pt' % self.args.model)
+
+        # if self.pretrain:
+        #     print("保存预训练参数")
+        #     data = {'net': auto_statedict,
+        #             'opt': auto_opt,
+        #             'sche': auto_sche,
+        #             }
+        #     torch.save(data, './results/%s/StateDict/preTrainNet.pt' % self.args.model)
+        # else:
+        #     print("保存模型所有参数")
+
+    def load_model(self):
+        data = None
+        if self.args.eval:
+            print("加载模型参数")
+            data = torch.load('./results/%s/StateDict/Net.pt' % self.args.model)
+            self.clusternet.load_state_dict(data['cluster_net'])
+            self.cluster_opt.load_state_dict(data['cluster_opt'])
+            self.cluster_sche.load_state_dict(data['cluster_sche'])
+        else:
+            print("加载预训练模型参数")
+            data = torch.load('./results/%s/StateDict/preTrainNet.pt' % self.args.model)
+
+        self.autoencoder.load_state_dict(data['auto_net'])
+        self.auto_opt.load_state_dict(data['auto_opt'])
+        self.auto_sche.load_state_dict(data['auto_sche'])

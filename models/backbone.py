@@ -9,11 +9,15 @@ class BackBone(nn.Module):
     activate = 'ReLU' or 'LeakyReLU'
     out_activate = 'ReLU' or 'LeakyReLU' or 'Sigmoid'
     """
-    def __init__(self, layers, batchnorm=False, activate='ReLU', out_activate='ReLU'):
+    def __init__(self, layers, batchnorm=False, activate='ReLU', out_activate='ReLU', dropout=False):
 
         super(BackBone, self).__init__()
         at = nn.Identity()
         out_at = nn.Identity()
+        dp = nn.Identity()
+        if dropout:
+            dp = nn.Dropout(0.1)
+
         if activate == 'ReLU':
             at = nn.ReLU(inplace=True)
         elif activate == 'LeakyReLU':
@@ -24,13 +28,17 @@ class BackBone(nn.Module):
             out_at = nn.LeakyReLU(0.2, inplace=True)
         elif out_activate == 'Sigmoid':
             out_at = nn.Sigmoid()
+        elif out_activate == 'Softmax':
+            out_at = nn.Softmax(dim=1)
 
         net = []
         for i in range(1, len(layers)):
             net.append(nn.Linear(layers[i - 1], layers[i]))
+            net.append(dp)
             if batchnorm:
                 net.append(nn.BatchNorm1d(layers[i]))
             net.append(at)
+
         net = net[:-1]
         net.append(out_at)
         self.net = nn.Sequential(*net)

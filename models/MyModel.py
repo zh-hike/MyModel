@@ -44,7 +44,7 @@ class Attention(nn.Module):
         new_x = 0
         for i, w in enumerate(ws):
             new_x += views[i]*w
-        return new_x
+        return new_x, ws
 
 
 class AutoEncoder(nn.Module):
@@ -83,7 +83,28 @@ class AutoEncoder(nn.Module):
 
     def forward(self, views):
         zs = self.encoder(views)
-        zs = self.attention(zs)
-        new_zs = [zs] * self.n_view
+        attention_zs, ws = self.attention(zs)
+        new_zs = [attention_zs] * self.n_view
         xs_bar = self.decoder(new_zs)
-        return zs, xs_bar
+        return zs, attention_zs, xs_bar, ws
+
+
+class Cluster(nn.Module):
+    def __init__(self, args):
+        super(Cluster, self).__init__()
+        dataset = args.dataset
+        n_classes = args.config['network'][dataset]['n_classes']
+        hidden_dim = args.hidden_dim
+        dims = args.config['network'][dataset]['cluster']['dims']
+        batchnorm = args.config['network'][dataset]['cluster']['batchnorm']
+        activate = args.config['network'][dataset]['cluster']['activate']
+        out_activate = args.config['network'][dataset]['cluster']['out_activate']
+        self.net = BackBone(layers=dims,
+                            batchnorm=batchnorm,
+                            activate=activate,
+                            out_activate=out_activate,
+                            dropout=False,)
+
+    def forward(self, x):
+        x = self.net(x)
+        return x

@@ -10,6 +10,7 @@ parse.add_argument('--eval', action='store_true', help="是否验证")
 parse.add_argument('--pretrain', action='store_true', help="是否进行预训练，若模型本身不需要预训练，则忽略")
 parse.add_argument('--purpose', type=str, choices=['train', 'ParamExperiment'], default='train')
 parse.add_argument('--hidden_dim', type=int, help="隐藏层维度", default=32)
+parse.add_argument('--sigma', type=float, help="高斯度量矩阵的超参数", default=2)
 parse.add_argument('--config', help="模型的配置参数")
 
 args = parse.parse_args()

@@ -4,8 +4,8 @@ def my_model(args):
 
         standard_method='MinMax',
         batch_size=999999,
-        epochs=100,
-        pre_epochs=10,
+        epochs=200,
+        pre_epochs=100,
         views_select=dict(
             voc=[0, 1],
         ),
@@ -13,6 +13,14 @@ def my_model(args):
 
         network=dict(
             voc=dict(
+                n_classes=20,
+                cluster=dict(
+                    dims=[hidden_dim, 64, 20],
+                    lr=1e-3,
+                    batchnorm=True,
+                    activate='ReLU',
+                    out_activate='Softmax',
+                ),
                 attention=dict(
                     tau=10,  # attention的温度参数
                     dims=[hidden_dim*2, hidden_dim, 64, 2],

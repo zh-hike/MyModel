@@ -1,6 +1,7 @@
 import torch
 from dataset.dataLoader import Data
 from Trainers.base_trainer import CreateTrainer
+from utils import eva
 
 """
 Trainer.py 的作用是做一个整体的训练框架，
@@ -33,15 +34,22 @@ class Trainer:
         self.n_classes = self.data.n_classes
 
     def train(self):
+        patten = 'epochs: %d/%d  [==============]  loss: %.8f      acc: %.4f     nmi:%.4f'
         trainer = CreateTrainer(self.args, self.device)
         for epoch in range(1, self.epochs + 1):
             for batch, (views, targets) in enumerate(self.dataloader, 1):
                 views = [views[i].to(self.device) for i in self.args.config['views_select'][self.args.dataset]]
                 pred = trainer.train_a_batch(views)
                 loss = trainer.trainer.loss
-                print(loss.item())
-                if pred is not None:
-                    self.eva(pred, targets)
+                if pred is None:
+                    print(loss.item())
+                else:
+                    acc, nmi, ari, f1 = self.eva(pred, targets.numpy())
+                    print(patten % (epoch, self.epochs, loss.item(), acc, nmi))
+
+            if self.args.eval:
+                print("验证结束!!")
+                break
         trainer.save_model()
 
     def eva(self, pred, targets):
@@ -51,5 +59,7 @@ class Trainer:
         :param targets:
         :return:
         """
-
-        pass
+        # print(pred.shape)
+        # print(targets.shape)
+        acc, nmi, ari, f1 = eva(targets, pred, self.n_classes)
+        return acc, nmi, ari, f1
