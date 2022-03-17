@@ -1,6 +1,7 @@
 import torch
 from models.MyModel import AutoEncoder, Cluster
 from loss.OtherLoss import MSELoss, Dreg, AttLoss
+from loss.ContrastLoss import Dsim, Dsc
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.cluster import KMeans
 from models.utils import weight_init
@@ -51,6 +52,8 @@ class MyTrainer:
         self.mseloss = MSELoss()
         self.dregloss = Dreg()
         self.att_loss = AttLoss(self.args.sigma)
+        self.Dsim_loss = Dsim(self.args.config['network'][self.dataset]['n_classes'], self.device)
+        self.Dsc_loss = Dsc(self.args.config['network'][self.dataset]['n_classes'])
         # if self.args.eval:
         #     self.autoencoder.eval()
         #     self.clusternet.eval()
@@ -72,18 +75,18 @@ class MyTrainer:
         self.loss += autoloss
 
         if not self.pretrain:
-            pred = self.add_compare_loss()
+            self.pred = self.add_compare_loss()
 
         self._grad_zero()
         self._backward()
         self._step()
 
         if self.pretrain:
-            # pred = self.cluster(self.attention_zs.detach().cpu().numpy())
-            # return pred
-            return None
+            pred = self.cluster(self.attention_zs.detach().cpu().numpy())
+            return pred
+            # return None
         else:
-            return pred.argmax(dim=1).detach().cpu().numpy()
+            return self.pred.argmax(dim=1).detach().cpu().numpy()
 
     def cluster(self, data):
         model = KMeans(self.args.config['network'][self.dataset]['n_classes'])
@@ -93,9 +96,13 @@ class MyTrainer:
     def add_compare_loss(self):
         pred = self.clusternet(self.attention_zs)
 
-        self.loss += 2*self.dregloss(pred)
+        self.loss += 1*self.dregloss(pred)
 
-        # self.loss += 1*self.att_loss(self.zs, self.ws, self.attention_zs)
+        # self.loss += 0.01*self.att_loss(self.zs, self.ws, self.attention_zs)
+
+        self.loss += 100*self.Dsim_loss(pred, self.attention_zs)
+        self.loss += 1*self.Dsc_loss(pred, self.attention_zs)
+
         return pred
 
     def _backward(self):

@@ -22,6 +22,7 @@ class Trainer:
             self.epochs = self.args.config['pre_epochs']
         self.device = torch.device('cpu')
         if self.args.which_gpu != -1:
+            print("调整map_location:", self.args.which_gpu)
             self.device = torch.device('cuda:%d' % self.args.which_gpu)
         self._init_data()
 

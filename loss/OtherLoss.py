@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from loss.utils import GaussianMatrix
+from loss.utils import GaussianMatrix, SimilarityMatrix
 
 
 class MSELoss:
@@ -31,11 +31,13 @@ class AttLoss:
 
     def __call__(self, zs, ws, attention_zs):
         Kc = 0
-        Kf = GaussianMatrix(attention_zs, self.sigma)
-        print(ws)
+        # Kf = GaussianMatrix(attention_zs, self.sigma)
+        Kf = SimilarityMatrix(attention_zs)
         for z, w in zip(zs, ws):
-            Kc += w * GaussianMatrix(z, self.sigma)
+            K = SimilarityMatrix(z)
+            Kc += w * K
 
-        K_loss = ((Kc - Kf)**2).sum()
-        print(K_loss)
+
+        K_loss = torch.sqrt(((Kc - Kf)**2).sum())
+        # print(K_loss)
         return K_loss

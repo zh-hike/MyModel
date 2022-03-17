@@ -4,6 +4,7 @@ from sklearn.metrics import accuracy_score as acc_score
 from sklearn.metrics import f1_score
 from munkres import Munkres
 import numpy as np
+import torch
 
 
 def eva(y_true, y_pred, n_clusters):
@@ -40,3 +41,11 @@ def eva(y_true, y_pred, n_clusters):
     f1 = f1_score(y_true, new_x.tolist(), average='macro')
 
     return acc, nmi_score, ari, f1
+
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+
+    torch.backends.cudnn.deterministic = True

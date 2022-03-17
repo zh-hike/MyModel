@@ -1,7 +1,7 @@
 import argparse
 from config.initConfig import SetConfig
 from Trainer import Trainer
-
+from utils import set_seed
 parse = argparse.ArgumentParser('PaperCode')
 parse.add_argument('--model', type=str, choices=['MyModel', 'Completer', 'EAMC'], default='MyModel')
 parse.add_argument('--dataset', type=str, choices=['voc', ], default='voc')
@@ -18,6 +18,8 @@ args = parse.parse_args()
 SetConfig(args)
 
 if __name__ == "__main__":
+    set_seed(args.config['network'][args.dataset]['seed'])
+
     if args.purpose == 'train':
         trainer = Trainer(args)
         trainer.train()

@@ -5,7 +5,7 @@ def my_model(args):
         standard_method='MinMax',
         batch_size=999999,
         epochs=200,
-        pre_epochs=100,
+        pre_epochs=150,
         views_select=dict(
             voc=[0, 1],
         ),
@@ -13,6 +13,7 @@ def my_model(args):
 
         network=dict(
             voc=dict(
+                seed=1,
                 n_classes=20,
                 cluster=dict(
                     dims=[hidden_dim, 64, 20],
