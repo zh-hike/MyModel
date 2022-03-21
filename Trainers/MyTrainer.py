@@ -1,7 +1,7 @@
 import torch
 from models.MyModel import AutoEncoder, Cluster
 from loss.OtherLoss import MSELoss, Dreg, AttLoss
-from loss.ContrastLoss import Dsim, Dsc
+from loss.ContrastLoss import Dsim, Dsc, AGCLoss
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.cluster import KMeans
 from models.utils import weight_init
@@ -54,6 +54,7 @@ class MyTrainer:
         self.att_loss = AttLoss(self.args.sigma)
         self.Dsim_loss = Dsim(self.args.config['network'][self.dataset]['n_classes'], self.device)
         self.Dsc_loss = Dsc(self.args.config['network'][self.dataset]['n_classes'])
+        self.Agc_loss = AGCLoss(device=self.device)
         # if self.args.eval:
         #     self.autoencoder.eval()
         #     self.clusternet.eval()
@@ -82,9 +83,9 @@ class MyTrainer:
         self._step()
 
         if self.pretrain:
-            pred = self.cluster(self.attention_zs.detach().cpu().numpy())
-            return pred
-            # return None
+            # pred = self.cluster(self.attention_zs.detach().cpu().numpy())
+            # return pred
+            return None
         else:
             return self.pred.argmax(dim=1).detach().cpu().numpy()
 
@@ -97,11 +98,12 @@ class MyTrainer:
         pred = self.clusternet(self.attention_zs)
 
         self.loss += 1*self.dregloss(pred)
-
+        # print(self.loss.device)
+        self.loss += 1*self.Agc_loss(self.attention_zs, pred)
         # self.loss += 0.01*self.att_loss(self.zs, self.ws, self.attention_zs)
 
-        self.loss += 100*self.Dsim_loss(pred, self.attention_zs)
-        self.loss += 1*self.Dsc_loss(pred, self.attention_zs)
+        # self.loss += 100*self.Dsim_loss(pred, self.attention_zs)
+        # self.loss += 1*self.Dsc_loss(pred, self.attention_zs)
 
         return pred
 

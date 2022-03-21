@@ -1,5 +1,10 @@
 import torch
 from loss.utils import SimilarityMatrix
+import math
+import torch.nn.functional as F
+import torch.nn as nn
+from loss.utils import get_neighbor
+
 
 
 class Dsim:
@@ -8,6 +13,7 @@ class Dsim:
     """
     def __init__(self, k, device):
         self.k = k
+        print("k: ", k)
         self.device = device
 
     def __call__(self, A, attention_zs):
@@ -59,3 +65,43 @@ class CL:
                 for v2 in range(v1+1, n_view):
                     P = P + zs[v1][i]
 
+
+class AGCLoss(nn.Module):
+    def __init__(self, device, entropy_weight=2.0):
+        super(AGCLoss, self).__init__()
+        self.device = device
+        self.xentropy = nn.CrossEntropyLoss().cuda()
+        self.lamda = entropy_weight
+        self.softmax = nn.Softmax(dim=1)
+        self.temperature = 1.0
+
+    def forward(self, attention_xs, pred):
+        """
+        :param attention_xs:  tensor x
+        :param pred:       tensor the pred of x
+        :return:
+        """
+        # print(attention_xs.device, pred.device)
+        neighbor_index = get_neighbor(attention_xs)
+        plogits = pred[neighbor_index]
+        ologits = pred
+
+        assert ologits.shape == plogits.shape, ('Inputs are required to have same shape')
+
+        ologits = self.softmax(ologits)
+        plogits = self.softmax(plogits)
+
+        # one-hot
+        similarity = torch.mm(F.normalize(ologits.t(), p=2, dim=1), F.normalize(plogits, p=2, dim=0))
+        loss_ce = self.xentropy(similarity, torch.arange(similarity.size(0), device=self.device))
+
+        # balance regularisation
+        o = ologits.sum(0).view(-1)
+        o /= o.sum()
+
+        loss_ne = math.log(o.size(0)) + (o * o.log()).sum()
+
+        loss = loss_ce + self.lamda * loss_ne
+
+        # return loss, loss_ce, loss_ne
+        return loss

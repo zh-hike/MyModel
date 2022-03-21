@@ -5,12 +5,18 @@ from sklearn.metrics import f1_score
 from munkres import Munkres
 import numpy as np
 import torch
+import random
+
+
+
 
 
 def eva(y_true, y_pred, n_clusters):
     """
     计算评估结果，acc,nmi,ari,f1
     """
+    y_true = y_true.astype('int')
+    y_pred = y_pred.astype('int')
     y_true = y_true - y_true.min()
 
     nmi_score = normalized_mutual_info_score(y_true, y_pred)
@@ -49,3 +55,20 @@ def set_seed(seed):
     np.random.seed(seed)
 
     torch.backends.cudnn.deterministic = True
+
+
+def get_missmatrix(miss_rate, n_view, n_sample):
+    miss_matrix = np.ones((n_sample, n_view))
+    all_index = list(range(n_sample))
+    miss_num = int(miss_rate * n_sample)
+    miss_index = random.sample(all_index, miss_num)
+    miss_num_of_a_sample = list(range(1, n_view))
+    miss_index_of_a_sample = list(range(0, n_view))
+    for index in miss_index:
+        miss_num_this_sample = random.choice(miss_num_of_a_sample)
+        m = random.sample(miss_index_of_a_sample, miss_num_this_sample)
+        miss_matrix[index][m] = 0
+
+    miss_matrix = torch.from_numpy(miss_matrix.astype('int'))
+    miss_matrixs = [miss_matrix.T[i].unsqueeze(1).numpy() for i in range(n_view)]
+    return miss_matrixs

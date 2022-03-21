@@ -2,6 +2,9 @@ import torch
 from dataset.dataLoader import Data
 from Trainers.base_trainer import CreateTrainer
 from utils import eva
+import numpy as np
+from utils import get_missmatrix
+
 
 """
 Trainer.py 的作用是做一个整体的训练框架，
@@ -15,6 +18,7 @@ Trainer.py 的作用是做一个整体的训练框架，
 class Trainer:
     def __init__(self, args):
         self.args = args
+        self.missing_rate = self.args.missing_rate
         self.pretrain = False
         self.epochs = self.args.config['epochs']
         if self.args.pretrain and self.args.config['needpretrain']:
@@ -38,15 +42,23 @@ class Trainer:
         patten = 'epochs: %d/%d  [==============]  loss: %.8f      acc: %.4f     nmi:%.4f'
         trainer = CreateTrainer(self.args, self.device)
         for epoch in range(1, self.epochs + 1):
+            all_pred = np.array([])
+            all_target = np.array([])
+            losses = 0
             for batch, (views, targets) in enumerate(self.dataloader, 1):
                 views = [views[i].to(self.device) for i in self.args.config['views_select'][self.args.dataset]]
                 pred = trainer.train_a_batch(views)
                 loss = trainer.trainer.loss
-                if pred is None:
-                    print(loss.item())
-                else:
-                    acc, nmi, ari, f1 = self.eva(pred, targets.numpy())
-                    print(patten % (epoch, self.epochs, loss.item(), acc, nmi))
+                losses += loss.item()
+                if pred is not None:
+                    all_pred = np.concatenate([all_pred, pred.squeeze()])
+                    all_target = np.concatenate([all_target, targets.numpy()])
+
+            if self.pretrain:
+                print("epochs: %s/%s  [=========]  loss: %.6f"%(epoch, self.epochs, losses))
+            else:
+                acc, nmi, ari, f1 = self.eva(all_pred, all_target)
+                print(patten % (epoch, self.epochs, losses, acc, nmi))
 
             if self.args.eval:
                 print("验证结束!!")

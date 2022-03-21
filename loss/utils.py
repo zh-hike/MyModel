@@ -1,5 +1,15 @@
 import torch
 
+def get_neighbor(x):
+    x = x / x.norm(dim=1).unsqueeze(1)
+    d = x.mm(x.T)
+    n = x.shape[0]
+    dig_index = list(range(n))
+    d[dig_index, dig_index] = 0
+    neighbor_index = d.argmax(dim=1)
+
+    return neighbor_index
+
 
 def GaussianMatrix(z, sigma=1):
     """

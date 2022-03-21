@@ -5,7 +5,7 @@ def Standard(data, standard):
     if standard is None:
         return data
 
-    method = {'MinMax': MinMaxScaler([0, 1]),
+    method = {'MinMax': MinMaxScaler([-1, 1]),
               'Standard': StandardScaler(),
               }
     preprocess = method[standard]

@@ -10,6 +10,13 @@
             </list>
           </settings>
         </remote-mappings>
+        <remote-mappings server-id="python@sftp://xzstu@10.128.217.173:22/home/xzstu/anaconda3/envs/zh/bin/python3.9">
+          <settings>
+            <list>
+              <mapping local-root="$PROJECT_DIR$" remote-root="/mnt/sda1/xzstu/zh/MyModel" />
+            </list>
+          </settings>
+        </remote-mappings>
       </list>
     </list>
   </component>
