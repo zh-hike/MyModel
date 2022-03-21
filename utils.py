@@ -8,9 +8,6 @@ import torch
 import random
 
 
-
-
-
 def eva(y_true, y_pred, n_clusters):
     """
     计算评估结果，acc,nmi,ari,f1

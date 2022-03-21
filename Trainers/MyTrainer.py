@@ -99,7 +99,7 @@ class MyTrainer:
 
         self.loss += 1*self.dregloss(pred)
         # print(self.loss.device)
-        self.loss += 1*self.Agc_loss(self.attention_zs, pred)
+        # self.loss += 1*self.Agc_loss(self.attention_zs, pred)
         # self.loss += 0.01*self.att_loss(self.zs, self.ws, self.attention_zs)
 
         # self.loss += 100*self.Dsim_loss(pred, self.attention_zs)

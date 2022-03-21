@@ -16,7 +16,7 @@ def my_model(args):
             voc=dict(
                 standard_method='MinMax',
                 batch_size=9999999,
-                seed=5,
+                seed=5,      # 5: 63
                 n_classes=20,
                 cluster=dict(
                     dims=[hidden_dim, 64, 20],
