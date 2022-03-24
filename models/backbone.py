@@ -48,3 +48,27 @@ class BackBone(nn.Module):
         x = self.net(x)
 
         return x
+
+
+
+class Block(nn.Module):
+    """
+    多是图的BackBone组合
+    dims = [[10,32,64..],
+            [23,32,64..],
+            ]
+
+    """
+
+    def __init__(self, dims, batchnorm=False, activate='ReLU', out_activate=None):
+        super(Block, self).__init__()
+        self.nets = nn.ModuleList([])
+        for dim in dims:
+            self.nets.append(BackBone(layers=dim, batchnorm=batchnorm, activate=activate, out_activate=out_activate))
+
+    def forward(self, views):
+        zs = []
+        for x, net in zip(views, self.nets):
+
+            zs.append(net(x))
+        return zs

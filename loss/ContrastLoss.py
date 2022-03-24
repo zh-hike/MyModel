@@ -1,16 +1,19 @@
+import sys
+
 import torch
 from loss.utils import SimilarityMatrix
 import math
 import torch.nn.functional as F
 import torch.nn as nn
 from loss.utils import get_neighbor
-
+import torch
 
 
 class Dsim:
     """
     EAMC 论文中损失
     """
+
     def __init__(self, k, device):
         self.k = k
         print("k: ", k)
@@ -35,6 +38,7 @@ class Dsc:
     EAMC
     论文中损失
     """
+
     def __init__(self, k):
         self.k = k
 
@@ -48,22 +52,47 @@ class Dsc:
         # print(D)
         return D
 
+
 class CL:
     """
     Completer 损失
     """
 
-    def __init__(self):
+    def __init__(self, alpha=9):
+        self.alpha = alpha
+        self.eps = sys.float_info.epsilon
         pass
 
     def __call__(self, zs):
         n_view = len(zs)
-        m = zs[0].shape[0]
-        P = 0
-        for i in range(m):
-            for v1 in range(n_view):
-                for v2 in range(v1+1, n_view):
-                    P = P + zs[v1][i]
+        # m = zs[0].shape[0]
+        losses = 0
+
+        for i in range(n_view):
+            for j in range(i + 1, n_view):
+                zi = zs[i].unsqueeze(2)
+                zj = zs[j].unsqueeze(1)
+                PP = zi @ zj
+
+                PP = PP.mean(dim=0)
+                PP = (PP + PP.t()) / 2
+                PP = PP / PP.sum()
+                PP_row = PP.sum(dim=1).detach()
+                PP_col = PP.sum(dim=0).detach()
+                PP[PP < self.eps] = self.eps
+                PP_row[PP_row < self.eps] = self.eps
+                PP_col[PP_col < self.eps] = self.eps
+                # print(PP_row.shape, PP_col.shape)
+                # mu = PP_row @ PP_col
+                # mu[mu < self.eps] = self.eps
+                # new_PP = PP / mu
+
+                loss = -PP * (
+                            torch.log(PP) - (self.alpha + 1) * torch.log(PP_row) - (self.alpha + 1) * torch.log(PP_col))
+                # print(new_PP)
+                # assert 1==0
+                losses += loss
+        return losses.sum()
 
 
 class AGCLoss(nn.Module):

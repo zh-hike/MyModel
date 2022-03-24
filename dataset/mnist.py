@@ -2,6 +2,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from dataset.utils import Standard
 import scipy.io as io
+import torch
 
 
 class Mnist(Dataset):
@@ -16,10 +17,9 @@ class Mnist(Dataset):
         self.convert_type(standard)
 
     def convert_type(self, standard):
-        self.targets = self.targets.astype('int16')
-        self.view_0 = self.view_0.astype('float32')
-        self.view_1 = self.view_1.astype('float32')
-
+        self.targets = self.targets.astype('int')
+        self.view_0 = torch.from_numpy(self.view_0.astype('float32'))
+        self.view_1 = torch.from_numpy(self.view_1.astype('float32'))
         self.view_0 = Standard(self.view_0, standard)
         self.view_1 = Standard(self.view_1, standard)
 

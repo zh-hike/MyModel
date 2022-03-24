@@ -1,28 +1,7 @@
 import torch
 import torch.nn as nn
 from models.backbone import BackBone
-
-
-class Block(nn.Module):
-    """
-    多是图的BackBone组合
-    dims = [[10,32,64..],
-            [23,32,64..],
-            ]
-
-    """
-
-    def __init__(self, dims, batchnorm=False, activate='ReLU', out_activate=None):
-        super(Block, self).__init__()
-        self.nets = nn.ModuleList([])
-        for dim in dims:
-            self.nets.append(BackBone(layers=dim, batchnorm=batchnorm, activate=activate, out_activate=out_activate))
-
-    def forward(self, views):
-        zs = []
-        for x, net in zip(views, self.nets):
-            zs.append(net(x))
-        return zs
+from models.backbone import Block
 
 
 class Attention(nn.Module):
@@ -43,7 +22,7 @@ class Attention(nn.Module):
         ws = ws.mean(dim=0)
         new_x = 0
         for i, w in enumerate(ws):
-            new_x += views[i]*w
+            new_x += views[i] * w
         return new_x, ws
 
 
@@ -52,12 +31,13 @@ class AutoEncoder(nn.Module):
         super(AutoEncoder, self).__init__()
         dataset = args.dataset
         self.n_view = len(args.config['views_select'][dataset])
-        encs = args.config['network'][dataset]['autoencoder']['encoder']['encs']
+        view_select = args.config['views_select'][dataset]
+        encs = [args.config['network'][dataset]['autoencoder']['encoder']['encs'][i] for i in view_select]
         hidden_dim = args.config['network'][dataset]['autoencoder']['hidden_dim']
-        for i in range(len(encs)):
+        for i in range(self.n_view):
             encs[i].append(hidden_dim)
-        decs = args.config['network'][dataset]['autoencoder']['decoder']['decs']
-        for i in range(len(decs)):
+        decs = [args.config['network'][dataset]['autoencoder']['decoder']['decs'][i] for i in view_select]
+        for i in range(self.n_view):
             decs[i] = [hidden_dim] + decs[i]
 
         enc_batchnorm = args.config['network'][dataset]['autoencoder']['encoder']['batchnorm']
@@ -82,7 +62,9 @@ class AutoEncoder(nn.Module):
                                    )
 
     def forward(self, views):
+
         zs = self.encoder(views)
+
         attention_zs, ws = self.attention(zs)
         new_zs = [attention_zs] * self.n_view
         xs_bar = self.decoder(new_zs)
@@ -103,7 +85,7 @@ class Cluster(nn.Module):
                             batchnorm=batchnorm,
                             activate=activate,
                             out_activate=out_activate,
-                            dropout=False,)
+                            dropout=False, )
 
     def forward(self, x):
         x = self.net(x)

@@ -1,7 +1,7 @@
 import numpy as np
 from torch.utils.data import Dataset
 from dataset.utils import Standard
-
+import torch
 
 class Voc(Dataset):
     def __init__(self, standard=None):
@@ -16,8 +16,10 @@ class Voc(Dataset):
 
     def convert_type(self, standard):
         self.targets = self.targets.astype('int16')
-        self.view_0 = self.view_0.astype('float32')
-        self.view_1 = self.view_1.astype('float32')
+        self.view_0 = torch.from_numpy(self.view_0.astype('float32'))
+        self.view_1 = torch.from_numpy(self.view_1.astype('float32'))
+        self.view_0 = Standard(self.view_0, standard)
+        self.view_1 = Standard(self.view_1, standard)
 
     def __getitem__(self, item):
         return (self.view_0[item], self.view_1[item]), self.targets[item]

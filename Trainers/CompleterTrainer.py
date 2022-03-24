@@ -1,5 +1,5 @@
 import torch
-from models.MyModel import AutoEncoder, Cluster
+from models.Completer import AutoEncoder
 from loss.OtherLoss import MSELoss, Dreg, AttLoss
 from loss.ContrastLoss import Dsim, Dsc, AGCLoss, CL
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -7,8 +7,7 @@ from sklearn.cluster import KMeans
 from models.utils import weight_init
 
 
-
-class MyTrainer:
+class CompleterTrainer:
     def __init__(self, args, device):
         self.args = args
         self.dataset = self.args.dataset
@@ -37,18 +36,8 @@ class MyTrainer:
                                            factor=0.5,
                                            verbose=True, )
 
-        self.clusternet = Cluster(self.args)
-        self.clusternet.to(self.device)
-        self.cluster_opt = torch.optim.Adam(self.clusternet.parameters(),
-                                            lr=self.args.config['network'][self.dataset]['cluster']['lr'])
-        self.cluster_sche = ReduceLROnPlateau(self.cluster_opt,
-                                              patience=self.epochs / 5,
-                                              factor=0.5,
-                                              verbose=True,
-                                              )
-
         # self.autoencoder.apply(weight_init)
-        self.clusternet.apply(weight_init)
+
         self.mseloss = MSELoss()
         self.dregloss = Dreg()
         self.att_loss = AttLoss(self.args.sigma)
@@ -58,7 +47,7 @@ class MyTrainer:
         self.CL_loss = CL()
 
         print(self.autoencoder)
-        print(self.clusternet)
+
         # if self.args.eval:
         #     self.autoencoder.eval()
         #     self.clusternet.eval()
@@ -72,7 +61,7 @@ class MyTrainer:
         self.loss = 0
 
         # zs: 多视图的list特征 ，  attention_zs: 进过attention融合后的，  xs_bar：自编码器的输出
-        self.zs, self.attention_zs, self.xs_bar, self.ws = self.autoencoder(views)
+        self.zs, self.xs_bar = self.autoencoder(views)
         autoloss = 0
         for x, x_bar in zip(views, self.xs_bar):
             autoloss += self.mseloss(x, x_bar)
@@ -87,24 +76,24 @@ class MyTrainer:
         self._step()
 
         if self.pretrain:
-            # pred = self.cluster(self.attention_zs.detach().cpu().numpy())
-            # return pred
-            return None
+            pred = self.cluster()
+            return pred
+
         else:
             # return self.pred.argmax(dim=1).detach().cpu().numpy()
             return self.pred
 
-    def cluster(self, data):
+    def cluster(self):
         model = KMeans(self.args.config['network'][self.dataset]['n_classes'])
-        pred = model.fit_predict(data)
+        z = torch.cat(self.zs, dim=1).detach().cpu().numpy()
+        pred = model.fit_predict(z)
         return pred
 
     def add_compare_loss(self):
-        pred = self.clusternet(self.attention_zs)
 
-        self.loss += 0.1*self.dregloss(pred)
+        # self.loss += 0.1 * self.dregloss(pred)
         self.loss += 1*self.CL_loss(self.zs)
-        # pred = self.cluster(self.attention_zs.detach().cpu().numpy())
+        pred = self.cluster()
         # print(self.loss.device)
         # self.loss += 1*self.Agc_loss(self.attention_zs, pred)
         # self.loss += 0.01*self.att_loss(self.zs, self.ws, self.attention_zs)
@@ -112,7 +101,7 @@ class MyTrainer:
         # self.loss += 100*self.Dsim_loss(pred, self.attention_zs)
         # self.loss += 1*self.Dsc_loss(pred, self.attention_zs)
 
-        return pred.argmax(dim=1).detach().cpu().numpy()
+        return pred
 
     def _backward(self):
         """
@@ -141,16 +130,11 @@ class MyTrainer:
         auto_opt = self.auto_opt.state_dict()
         auto_sche = self.auto_sche.state_dict()
 
-        cluster_net = self.clusternet.state_dict()
-        cluster_opt = self.cluster_opt.state_dict()
-        cluster_sche = self.cluster_sche.state_dict()
 
         data = {'auto_net': auto_statedict,
                 'auto_opt': auto_opt,
                 'auto_sche': auto_sche,
-                'cluster_net': cluster_net,
-                'cluster_opt': cluster_opt,
-                'cluster_sche': cluster_sche,
+
                 }
         if self.args.eval:
             return
@@ -176,9 +160,7 @@ class MyTrainer:
         if self.args.eval:
             print("加载模型参数")
             data = torch.load('./results/%s/StateDict/Net.pt' % self.args.model)
-            self.clusternet.load_state_dict(data['cluster_net'])
-            self.cluster_opt.load_state_dict(data['cluster_opt'])
-            self.cluster_sche.load_state_dict(data['cluster_sche'])
+
         else:
             print("加载预训练模型参数")
             data = torch.load('./results/%s/StateDict/preTrainNet.pt' % self.args.model)

@@ -1,9 +1,10 @@
 # MyModel, voc
 # pretrain
-python3 run.py --purpose train --pretrain --dataset voc --which_gpu 1
+python3 run.py --purpose train --pretrain --which_gpu 0 --model Completer --dataset Caltech
+
 
 # train
-python3 run.py --purpose train --dataset voc --which_gpu 1
+python3 run.py --purpose train --which_gpu 0 --model Completer --dataset Caltech
 
 # eval
-python3 run.py --eval --dataset voc --which_gpu 1
+python3 run.py --eval --which_gpu 0 --model Completer --dataset Caltech
