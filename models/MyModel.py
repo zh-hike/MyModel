@@ -90,3 +90,49 @@ class Cluster(nn.Module):
     def forward(self, x):
         x = self.net(x)
         return x
+
+
+class CrossAutoEncoder(nn.Module):
+    def __init__(self, args):
+        super(CrossAutoEncoder, self).__init__()
+        dataset = args.dataset
+        layer = args.config['network'][dataset]['crossAutoencoder']['layer']
+        batchnorm = args.config['network'][dataset]['crossAutoencoder']['batchnorm']
+        activate = args.config['network'][dataset]['crossAutoencoder']['activate']
+        out_activate = args.config['network'][dataset]['crossAutoencoder']['out_activate']
+
+        self.crossLayer1 = BackBone(layer, batchnorm, activate, out_activate)
+        self.crossLayer2 = BackBone(layer, batchnorm, activate, out_activate)
+
+    def forward(self, zs):
+        z1, z2 = zs
+        z2_bar, z1_bar = self.crossLayer1(z1), self.crossLayer2(z2)
+
+        return z1_bar, z2_bar
+
+
+class CrossAttentionAutoEncoder(nn.Module):
+    def __init__(self, args):
+        super(CrossAttentionAutoEncoder, self).__init__()
+        # print(args.config)
+
+        dataset = args.dataset
+        n_view = len(args.config['views_select'][dataset])
+        layer = args.config['network'][dataset]['crossAttentionAutoencoder']['layer']
+        batchnorm = args.config['network'][dataset]['crossAttentionAutoencoder']['batchnorm']
+        activate = args.config['network'][dataset]['crossAttentionAutoencoder']['activate']
+        out_activate = args.config['network'][dataset]['crossAttentionAutoencoder']['out_activate']
+        self.attentionLayers = nn.ModuleList([])
+        for i in range(n_view):
+            self.attentionLayers.append(BackBone(layer, batchnorm, activate, out_activate))
+        # self.crossLayer1 = BackBone(layer, batchnorm, activate, out_activate)
+        # self.crossLayer2 = BackBone(layer, batchnorm, activate, out_activate)
+
+    def forward(self, zs):
+        zs_bar = []
+        for i, z in enumerate(zs):
+            zs_bar.append(self.attentionLayers[i](z))
+        # z1, z2 = zs
+        # z2_bar, z1_bar = self.crossLayer1(z1), self.crossLayer2(z2)
+
+        return zs_bar

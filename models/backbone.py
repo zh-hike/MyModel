@@ -9,14 +9,15 @@ class BackBone(nn.Module):
     activate = 'ReLU' or 'LeakyReLU'
     out_activate = 'ReLU' or 'LeakyReLU' or 'Sigmoid'
     """
-    def __init__(self, layers, batchnorm=False, activate='ReLU', out_activate='ReLU', dropout=False):
+
+    def __init__(self, layers, batchnorm=False, activate='ReLU', out_activate='ReLU', dropout=False, out_batchnorm=True):
 
         super(BackBone, self).__init__()
         at = nn.Identity()
         out_at = nn.Identity()
-        dp = nn.Identity()
-        if dropout:
-            dp = nn.Dropout(0.1)
+        # dp = nn.Identity()
+        # if dropout:
+        #     dp = nn.Dropout(0.1)
 
         if activate == 'ReLU':
             at = nn.ReLU(inplace=True)
@@ -34,13 +35,16 @@ class BackBone(nn.Module):
         net = []
         for i in range(1, len(layers)):
             net.append(nn.Linear(layers[i - 1], layers[i]))
-            net.append(dp)
+            # net.append(dp)
             if batchnorm:
                 net.append(nn.BatchNorm1d(layers[i]))
             net.append(at)
 
-        net = net[:-1]
-        net.append(out_at)
+        net = net[:-2]
+        if out_activate is not None:
+            if out_batchnorm:
+                net.append(nn.BatchNorm1d(layers[i]))
+            net.append(out_at)
         self.net = nn.Sequential(*net)
 
     def forward(self, x):
@@ -48,7 +52,6 @@ class BackBone(nn.Module):
         x = self.net(x)
 
         return x
-
 
 
 class Block(nn.Module):
@@ -60,15 +63,21 @@ class Block(nn.Module):
 
     """
 
-    def __init__(self, dims, batchnorm=False, activate='ReLU', out_activate=None):
+    def __init__(self, dims, batchnorm=False, activate='ReLU', out_activate=None, out_batchnorm=True):
         super(Block, self).__init__()
         self.nets = nn.ModuleList([])
         for dim in dims:
-            self.nets.append(BackBone(layers=dim, batchnorm=batchnorm, activate=activate, out_activate=out_activate))
+            self.nets.append(
+                BackBone(layers=dim,
+                         batchnorm=batchnorm,
+                         activate=activate,
+                         out_activate=out_activate,
+                         out_batchnorm=out_batchnorm
+                         )
+            )
 
     def forward(self, views):
         zs = []
         for x, net in zip(views, self.nets):
-
             zs.append(net(x))
         return zs

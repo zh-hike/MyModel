@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 from loss.utils import GaussianMatrix, SimilarityMatrix
-
+import torch.nn.functional as F
 
 class MSELoss:
     def __init__(self):
@@ -20,6 +20,7 @@ class Dreg:
         pass
 
     def __call__(self, A):
+        # A = F.normalize(A, p=2)
         d = A.T @ A
         return torch.triu(d, diagonal=1).sum()
 

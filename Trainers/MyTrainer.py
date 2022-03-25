@@ -1,5 +1,5 @@
 import torch
-from models.MyModel import AutoEncoder, Cluster
+from models.MyModel import AutoEncoder, Cluster, CrossAutoEncoder, CrossAttentionAutoEncoder
 from loss.OtherLoss import MSELoss, Dreg, AttLoss
 from loss.ContrastLoss import Dsim, Dsc, AGCLoss, CL
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
@@ -54,6 +54,26 @@ class MyTrainer:
         #                                       T_max=15,
         #                                       eta_min=0)
 
+        self.crossAuto = CrossAutoEncoder(self.args)
+        self.crossAuto.to(self.device)
+        self.crossAuto_opt = torch.optim.Adam(self.crossAuto.parameters(),
+                                              lr=self.args.config['network'][self.dataset]['crossAutoencoder']['lr'])
+        self.crossAuto_sche = ReduceLROnPlateau(self.crossAuto_opt,
+                                                patience=self.epochs / 5,
+                                                factor=0.5,
+                                                verbose=True, )
+
+        self.crossAtten = CrossAttentionAutoEncoder(self.args)
+        self.crossAtten.to(self.device)
+        self.crossAtten_opt = torch.optim.Adam(self.crossAtten.parameters(),
+                                               lr=
+                                               self.args.config['network'][self.dataset]['crossAttentionAutoencoder'][
+                                                   'lr'])
+        self.crossAtten_sche = ReduceLROnPlateau(self.crossAtten_opt,
+                                                 patience=self.epochs / 5,
+                                                 factor=0.5,
+                                                 verbose=True, )
+
         # self.autoencoder.apply(weight_init)
         self.clusternet.apply(weight_init)
         self.mseloss = MSELoss()
@@ -86,6 +106,24 @@ class MyTrainer:
 
         self.loss += autoloss
 
+        # 交叉自编码器
+        # z1, z2 = self.zs
+        # z1_bar, z2_bar = self.crossAuto(self.zs)
+        # cross_loss = self.mseloss(z1_bar, z1) + self.mseloss(z2_bar, z2)
+        # self.loss += cross_loss
+
+        # 交叉注意力
+        # zs_bar = self.crossAtten(self.zs)
+        # crossAtten_loss = 0
+        #
+        # for z_bar in zs_bar:
+        #     # print(z_bar.shape)
+        #     # print(self.attention_zs.shape)
+        #     crossAtten_loss += self.mseloss(z_bar, self.attention_zs.detach())
+        #
+        # self.loss += crossAtten_loss
+
+
         if not self.pretrain:
             self.pred = self.add_compare_loss()
 
@@ -109,14 +147,16 @@ class MyTrainer:
     def add_compare_loss(self):
         pred = self.clusternet(self.attention_zs)
 
-        self.loss += 0.01*self.dregloss(pred)
+        self.loss += 0.01 * self.dregloss(pred)
         # self.loss += 10*self.CL_loss(self.zs)
-        self.loss += self.lambd*self.ProtoNCE_loss(self.attention_zs)
+        self.loss += self.lambd * self.ProtoNCE_loss(self.attention_zs)
         # pred = self.cluster(self.attention_zs.detach().cpu().numpy())
         # print(self.loss.device)
+
+
+
         # self.loss += 1*self.Agc_loss(self.attention_zs, pred)
         # self.loss += 0.01*self.att_loss(self.zs, self.ws, self.attention_zs)
-
         # self.loss += 100*self.Dsim_loss(pred, self.attention_zs)
         # self.loss += 1*self.Dsc_loss(pred, self.attention_zs)
         # return pred
@@ -134,11 +174,22 @@ class MyTrainer:
         优化器更新
         :return:
         """
+
+        # 自编码器
         self.auto_opt.step()
         self.auto_sche.step(self.loss.item())
+
+        # 聚类
         self.cluster_opt.step()
         self.cluster_sche.step(self.loss.item())
 
+        # 交叉自编码器
+        # self.crossAuto_opt.step()
+        # self.crossAuto_sche.step(self.loss.item())
+
+        # 交叉注意力
+        # self.crossAtten_opt.step()
+        # self.crossAtten_sche.step(self.loss.item())
 
     def _grad_zero(self):
         """
@@ -147,6 +198,8 @@ class MyTrainer:
         """
         self.auto_opt.zero_grad()
         self.cluster_opt.zero_grad()
+        # self.crossAuto_opt.zero_grad()
+        # self.crossAtten_opt.zero_grad()
 
     def save_model(self):
         auto_statedict = self.autoencoder.state_dict()
@@ -157,12 +210,25 @@ class MyTrainer:
         cluster_opt = self.cluster_opt.state_dict()
         cluster_sche = self.cluster_sche.state_dict()
 
+        crossAuto_statedict = self.crossAuto.state_dict()
+        cross_opt = self.crossAuto_opt.state_dict()
+        cross_sche = self.crossAuto_sche.state_dict()
+
+        crossAtten_statedict = self.crossAtten.state_dict()
+        crossAtten_opt = self.crossAtten_opt.state_dict()
+        crossAtten_sche = self.crossAtten_sche.state_dict()
         data = {'auto_net': auto_statedict,
                 'auto_opt': auto_opt,
                 'auto_sche': auto_sche,
                 'cluster_net': cluster_net,
                 'cluster_opt': cluster_opt,
                 'cluster_sche': cluster_sche,
+                'crossAuto_net': crossAuto_statedict,
+                'cross_opt': cross_opt,
+                'cross_sche': cross_sche,
+                'crossAtten_net': crossAtten_statedict,
+                'crossAtten_opt': crossAtten_opt,
+                'crossAtten_sche': crossAtten_sche,
                 }
         if self.args.eval:
             return
@@ -198,3 +264,11 @@ class MyTrainer:
         self.autoencoder.load_state_dict(data['auto_net'])
         self.auto_opt.load_state_dict(data['auto_opt'])
         self.auto_sche.load_state_dict(data['auto_sche'])
+        self.crossAuto.load_state_dict(data['crossAuto_net'])
+        self.crossAuto_opt.load_state_dict(data['cross_opt'])
+        self.crossAuto_sche.load_state_dict(data['cross_sche'])
+
+        self.crossAtten.load_state_dict(data['crossAtten_net'])
+        self.crossAtten_opt.load_state_dict(data['crossAtten_opt'])
+        self.crossAtten_sche.load_state_dict(data['crossAtten_sche'])
+

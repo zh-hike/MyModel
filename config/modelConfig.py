@@ -1,8 +1,8 @@
 def my_model(args):
     hidden_dim = args.hidden_dim
     config = dict(
-
-        epochs=150,
+        model='MyModel',
+        epochs=300,
         pre_epochs=150,
         views_select=dict(
             voc=[0, 1],
@@ -13,12 +13,12 @@ def my_model(args):
 
         network=dict(
             voc=dict(
-
-                standard_method='L2',  # MinMax, L2, Standard
+                name='voc',
+                standard_method='MinMax',  # MinMax, L2, Standard
                 batch_size=9999999,
                 seed=10,  # 5: 63
                 lambd=1,
-                Proto_Cluster=[5, 7, 9],
+                Proto_Cluster=[3, 5, 7],
                 n_classes=20,
                 cluster=dict(
                     dims=[hidden_dim, 64, 20],
@@ -34,6 +34,22 @@ def my_model(args):
                     batchnorm=True,
                     activate='LeakyReLU',
                     out_activate='Sigmoid',
+                ),
+                crossAutoencoder=dict(
+                    lr=1e-4,
+                    hidden_dim=hidden_dim,
+                    layer=[hidden_dim, hidden_dim * 2, hidden_dim * 2, hidden_dim],
+                    batchnorm=True,
+                    activate='ReLU',
+                    out_activate='ReLU',
+                ),
+                crossAttentionAutoencoder=dict(
+                    lr=1e-4,
+                    hidden_dim=hidden_dim,
+                    layer=[hidden_dim, hidden_dim * 2, hidden_dim * 2, hidden_dim],
+                    batchnorm=True,
+                    activate='ReLU',
+                    out_activate='ReLU',
                 ),
                 autoencoder=dict(
                     lr=1e-3,
@@ -57,6 +73,7 @@ def my_model(args):
 
             ),
             mnist=dict(
+                name='mnist',
                 standard_method='MinMax',  # MinMax, L2, Standard
                 batch_size=9999999,
                 seed=1,  # 0:88
@@ -70,6 +87,22 @@ def my_model(args):
                     activate='ReLU',
                     out_activate='Softmax',
                 ),
+                crossAutoencoder=dict(
+                    lr=1e-4,
+                    hidden_dim=hidden_dim,
+                    layer=[hidden_dim, hidden_dim * 2, hidden_dim * 2, hidden_dim],
+                    batchnorm=True,
+                    activate='ReLU',
+                    out_activate='ReLU',
+                ),
+                crossAttentionAutoencoder=dict(
+                    lr=1e-4,
+                    hidden_dim=hidden_dim,
+                    layer=[hidden_dim, hidden_dim * 2, hidden_dim * 2, hidden_dim],
+                    batchnorm=True,
+                    activate='ReLU',
+                    out_activate='ReLU',
+                ),
                 attention=dict(
                     tau=10,  # attention的温度参数
                     dims=[hidden_dim * 2, 32, 2],
@@ -82,16 +115,16 @@ def my_model(args):
                     lr=1e-4,
                     hidden_dim=hidden_dim,
                     encoder=dict(
-                        encs=[[784, 1000],
-                              [256, 1000], ],
+                        encs=[[784, 1024, 1024],
+                              [256, 1024, 1024], ],
 
                         batchnorm=True,
                         activate='ReLU',
                         out_activate='ReLU',
                     ),
                     decoder=dict(
-                        decs=[[1000, 784],
-                              [1000, 256]],
+                        decs=[[1024, 1024, 784],
+                              [1024, 1024, 256]],
                         batchnorm=True,
                         activate='ReLU',
                         out_activate=None,
@@ -112,6 +145,22 @@ def my_model(args):
                     batchnorm=True,
                     activate='ReLU',
                     out_activate='Softmax',
+                ),
+                crossAutoencoder=dict(
+                    lr=1e-4,
+                    hidden_dim=hidden_dim,
+                    layer=[hidden_dim, hidden_dim * 2, hidden_dim * 2, hidden_dim],
+                    batchnorm=True,
+                    activate='ReLU',
+                    out_activate='ReLU',
+                ),
+                crossAttentionAutoencoder=dict(
+                    lr=1e-4,
+                    hidden_dim=hidden_dim,
+                    layer=[hidden_dim, hidden_dim * 2, hidden_dim * 2, hidden_dim],
+                    batchnorm=True,
+                    activate='ReLU',
+                    out_activate='ReLU',
                 ),
                 attention=dict(
                     tau=10,  # attention的温度参数
@@ -160,7 +209,7 @@ def my_model(args):
 def Completer(args):
     hidden_dim = args.hidden_dim
     config = dict(
-        epochs=150,
+        epochs=500,
         pre_epochs=100,
         views_select=dict(
             voc=[0, 1],
@@ -212,15 +261,25 @@ def Completer(args):
 
             ),
             mnist=dict(
-                standard_method='MinMax',  # MinMax, L2, Standard
+                standard_method='L2',  # MinMax, L2, Standard
                 batch_size=9999999,
                 seed=20,  # 0:88
                 n_classes=10,
+                hidden_dim=64,
                 cluster=dict(
-                    dims=[hidden_dim, 64, 10],
+                    dims=[64, 64, 10],
                     lr=1e-3,
                     batchnorm=True,
                     activate='ReLU',
+                    out_activate='Softmax',
+                ),
+                crossAutoencoder=dict(
+                    lr=1e-4,
+                    hidden_dim=64,
+                    layer=[64, 128, 256, 128, 256, 128, 64],
+                    batchnorm=True,
+                    activate='ReLU',
+                    out_batchnorm=False,
                     out_activate='Softmax',
                 ),
                 attention=dict(
@@ -233,20 +292,22 @@ def Completer(args):
                 ),
                 autoencoder=dict(
                     lr=1e-4,
-                    hidden_dim=hidden_dim,
+                    hidden_dim=64,
                     encoder=dict(
                         encs=[[784, 1024, 1024, 1024],
                               [256, 1024, 1024, 1024], ],
 
                         batchnorm=True,
                         activate='ReLU',
-                        out_activate='ReLU',
+                        out_batchnorm=False,
+                        out_activate='Softmax',
                     ),
                     decoder=dict(
                         decs=[[1024, 1024, 1024, 784],
                               [1024, 1024, 1024, 256]],
                         batchnorm=True,
                         activate='ReLU',
+                        out_batchnorm=True,
                         out_activate='ReLU',
                     ),
                 )
@@ -257,10 +318,19 @@ def Completer(args):
                 batch_size=9999999,
                 seed=0,  # 3:88
                 n_classes=20,
-
+                hidden_dim=128,
+                crossAutoencoder=dict(
+                    lr=1e-3,
+                    hidden_dim=128,
+                    layer=[128, 128, 256, 128, 256, 128, 128],
+                    batchnorm=True,
+                    activate='ReLU',
+                    out_batchnorm=False,
+                    out_activate='Softmax',
+                ),
                 autoencoder=dict(
                     lr=1e-4,
-                    hidden_dim=hidden_dim,
+                    hidden_dim=128,
                     encoder=dict(
                         encs=[[48, 1024],
                               [40, 1024],
@@ -272,6 +342,7 @@ def Completer(args):
 
                         batchnorm=True,
                         activate='ReLU',
+                        out_batchnorm=False,
                         out_activate='Softmax',
                     ),
                     decoder=dict(
@@ -283,6 +354,7 @@ def Completer(args):
                               [1500, 928], ],
                         batchnorm=True,
                         activate='ReLU',
+                        out_batchnorm=True,
                         out_activate='ReLU',
                     ),
                 )

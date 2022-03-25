@@ -2,7 +2,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from dataset.utils import Standard
 import scipy.io as io
-
+import torch
 
 class Caltech(Dataset):
     def __init__(self, standard=None):
@@ -31,12 +31,12 @@ class Caltech(Dataset):
         self.view_4 = self.view_4.astype('float32')
         self.view_5 = self.view_5.astype('float32')
 
-        self.view_0 = Standard(self.view_0, standard)
-        self.view_1 = Standard(self.view_1, standard)
-        self.view_2 = Standard(self.view_2, standard)
-        self.view_3 = Standard(self.view_3, standard)
-        self.view_4 = Standard(self.view_4, standard)
-        self.view_5 = Standard(self.view_5, standard)
+        self.view_0 = Standard(torch.tensor(self.view_0), standard)
+        self.view_1 = Standard(torch.tensor(self.view_1), standard)
+        self.view_2 = Standard(torch.tensor(self.view_2), standard)
+        self.view_3 = Standard(torch.tensor(self.view_3), standard)
+        self.view_4 = Standard(torch.tensor(self.view_4), standard)
+        self.view_5 = Standard(torch.tensor(self.view_5), standard)
 
     def __getitem__(self, item):
         return (self.view_0[item], self.view_1[item],self.view_2[item], self.view_3[item],self.view_4[item], self.view_5[item]),\
