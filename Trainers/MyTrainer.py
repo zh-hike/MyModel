@@ -2,10 +2,10 @@ import torch
 from models.MyModel import AutoEncoder, Cluster
 from loss.OtherLoss import MSELoss, Dreg, AttLoss
 from loss.ContrastLoss import Dsim, Dsc, AGCLoss, CL
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 from sklearn.cluster import KMeans
 from models.utils import weight_init
-
+from loss.ContrastLoss import ProtoNCE
 
 
 class MyTrainer:
@@ -14,6 +14,7 @@ class MyTrainer:
         self.dataset = self.args.dataset
         self.pretrain = False
         self.epochs = self.args.config['epochs']
+        self.lambd = self.args.config['network'][self.dataset]['lambd']
         if self.args.pretrain and self.args.config['needpretrain']:
             self.pretrain = True
             self.epochs = self.args.config['pre_epochs']
@@ -36,6 +37,9 @@ class MyTrainer:
                                            patience=self.epochs / 5,
                                            factor=0.5,
                                            verbose=True, )
+        # self.auto_sche = CosineAnnealingLR(self.auto_opt,
+        #                                    T_max=15,
+        #                                    eta_min=0)
 
         self.clusternet = Cluster(self.args)
         self.clusternet.to(self.device)
@@ -46,6 +50,9 @@ class MyTrainer:
                                               factor=0.5,
                                               verbose=True,
                                               )
+        # self.cluster_sche = CosineAnnealingLR(self.cluster_opt,
+        #                                       T_max=15,
+        #                                       eta_min=0)
 
         # self.autoencoder.apply(weight_init)
         self.clusternet.apply(weight_init)
@@ -56,9 +63,9 @@ class MyTrainer:
         self.Dsc_loss = Dsc(self.args.config['network'][self.dataset]['n_classes'])
         self.Agc_loss = AGCLoss(device=self.device)
         self.CL_loss = CL()
-
-        print(self.autoencoder)
-        print(self.clusternet)
+        self.ProtoNCE_loss = ProtoNCE(self.device, clusters=self.args.config['network'][self.dataset]['Proto_Cluster'])
+        # print(self.autoencoder)
+        # print(self.clusternet)
         # if self.args.eval:
         #     self.autoencoder.eval()
         #     self.clusternet.eval()
@@ -102,8 +109,9 @@ class MyTrainer:
     def add_compare_loss(self):
         pred = self.clusternet(self.attention_zs)
 
-        self.loss += 0.1*self.dregloss(pred)
-        self.loss += 1*self.CL_loss(self.zs)
+        self.loss += 0.01*self.dregloss(pred)
+        # self.loss += 10*self.CL_loss(self.zs)
+        self.loss += self.lambd*self.ProtoNCE_loss(self.attention_zs)
         # pred = self.cluster(self.attention_zs.detach().cpu().numpy())
         # print(self.loss.device)
         # self.loss += 1*self.Agc_loss(self.attention_zs, pred)
@@ -111,7 +119,7 @@ class MyTrainer:
 
         # self.loss += 100*self.Dsim_loss(pred, self.attention_zs)
         # self.loss += 1*self.Dsc_loss(pred, self.attention_zs)
-
+        # return pred
         return pred.argmax(dim=1).detach().cpu().numpy()
 
     def _backward(self):
@@ -128,6 +136,9 @@ class MyTrainer:
         """
         self.auto_opt.step()
         self.auto_sche.step(self.loss.item())
+        self.cluster_opt.step()
+        self.cluster_sche.step(self.loss.item())
+
 
     def _grad_zero(self):
         """
@@ -135,6 +146,7 @@ class MyTrainer:
         :return:
         """
         self.auto_opt.zero_grad()
+        self.cluster_opt.zero_grad()
 
     def save_model(self):
         auto_statedict = self.autoencoder.state_dict()

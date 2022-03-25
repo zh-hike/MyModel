@@ -1,5 +1,5 @@
 import sys
-
+import faiss
 import torch
 from loss.utils import SimilarityMatrix
 import math
@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from loss.utils import get_neighbor
 import torch
+import numpy as np
 
 
 class Dsim:
@@ -88,7 +89,7 @@ class CL:
                 # new_PP = PP / mu
 
                 loss = -PP * (
-                            torch.log(PP) - (self.alpha + 1) * torch.log(PP_row) - (self.alpha + 1) * torch.log(PP_col))
+                        torch.log(PP) - (self.alpha + 1) * torch.log(PP_row) - (self.alpha + 1) * torch.log(PP_col))
                 # print(new_PP)
                 # assert 1==0
                 losses += loss
@@ -133,4 +134,63 @@ class AGCLoss(nn.Module):
         loss = loss_ce + self.lamda * loss_ne
 
         # return loss, loss_ce, loss_ne
+        return loss
+
+
+class ProtoNCE:
+    def __init__(self, device, alpha=9, clusters=[3, 5, 7]):
+        self.device = device
+        self.clusters = clusters
+        self.alpha = alpha
+        self.cri = nn.CrossEntropyLoss()
+
+    def __call__(self, z):
+        # z = F.normalize(z, p=2)
+        n, dim = z.shape
+        losses = []
+        # data = {'Centers': [], 'phis': []}
+        dz = z.detach().cpu().numpy()
+        for n_cluster in self.clusters:
+            clus = faiss.Clustering(dim, n_cluster)
+            res = faiss.StandardGpuResources()
+            index = faiss.IndexFlatL2(dim)
+            index = faiss.index_cpu_to_gpu(res, 0, index)
+            clus.train(dz, index)
+            D, I = index.search(dz, 1)
+            D = D.squeeze()
+            I = I.squeeze()
+            centers = faiss.vector_to_array(clus.centroids)
+            DCluster = [[] for i in range(n_cluster)]
+            for index, d in enumerate(D):
+                DCluster[I[index]].append(d)
+
+            phis = []
+            for i in DCluster:
+                phi = (np.array(i) ** 0.5).mean() / np.log(len(i) + self.alpha)
+                phis.append(phi)
+            phis = np.array(phis)
+            phi_max = phi.max()
+            for i, DC in enumerate(DCluster):
+                if len(DC) <= 1:
+                    phis[i] = phi_max
+            phis = phis.clip(np.percentile(phis, 10), np.percentile(phis, 90))
+
+            phis = torch.from_numpy(phis).to(self.device)
+            centers = torch.tensor(centers, device=self.device).view(n_cluster, -1)
+            # print(['%.2f'%i for i in phis])
+
+            centers = nn.functional.normalize(centers, p=2, dim=1)
+            sims = (z @ centers.T) / phis
+            # print(sims.shape)
+            # print(I.shape, I.min(), I.max())
+            I = torch.tensor(I, dtype=torch.int64, device=self.device)
+            sims = self.cri(sims, I)
+
+
+            # sims = torch.exp(sims)
+            # sims = sims / sims.sum(dim=1).unsqueeze(1)
+            # sims = -1*torch.log(sims).mean()
+            losses.append(sims)
+        loss = (sum(losses) / len(losses))
+        # print(loss)
         return loss
